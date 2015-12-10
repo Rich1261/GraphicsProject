@@ -1,8 +1,9 @@
-#include "ModelLoader.h"
+#pragma once
+#include "stdafx.h"
 
 class Floor{
 private:
-	ID3D11Buffer *VertexBuffer = nullptr, *IndexBuffer = nullptr, *ConstWorldMatrixBuffer = nullptr, *spotlightPosBuffer;
+	ID3D11Buffer *VertexBuffer = nullptr, *IndexBuffer = nullptr, *ConstWorldMatrixBuffer = nullptr, *spotlightPosBuffer = nullptr, *pointlightposbuffer = nullptr, *directionalLightBuffer = nullptr;
 	ID3D11InputLayout *InputLayout = nullptr;
 	ID3D11VertexShader *VertexShader = nullptr;
 	ID3D11PixelShader *PixelShader = nullptr;
@@ -24,12 +25,20 @@ private:
 	float flipTime = 1.0f;
 	bool tempIndexedFlag = true;
 	HRESULT hr;
-	float4 spotlightPos;
+	Spotlight spotlight;
+	SpotlightStats slstats;
+	PointLight pointlight;
+	PointLightStats PLStats;
+	DirectionalLight directionallight;
+	DirectionalLightStats DLStats;
+	float4 pointlightPos;
+	bool left = false;
 public:
 	HRESULT Instantiate(ID3D11Device *device, vector<_OBJ_VERT_> *coordArray, vector<UINT> *indexArray, ID3D11ShaderResourceView *_srv = nullptr){
+		
 		if (_srv != nullptr) shaderResourceView = _srv;
 		sizeofIndexArray = indexArray->size();
-
+		
 		XMMATRIX identity = XMMatrixIdentity();
 		XMStoreFloat4x4(&WorldMatrix, identity);
 
@@ -74,14 +83,41 @@ public:
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		bufferDesc.MiscFlags = NULL;
-		bufferDesc.ByteWidth = sizeof(float4);
+		bufferDesc.ByteWidth = sizeof(slstats);
 		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.StructureByteStride = sizeof(float4);
-		subResourceData.pSysMem = &spotlightPos;
+		bufferDesc.StructureByteStride = sizeof(slstats);
+		subResourceData.pSysMem = &slstats;
 		subResourceData.SysMemPitch = 0;
 		subResourceData.SysMemSlicePitch = 0;
 		hr = device->CreateBuffer(&bufferDesc, NULL, &spotlightPosBuffer);
-		spotlightPos = float4(0, -8, 0, 0);
+		slstats.pos = float4(0, -9.5, 0, 0);
+		slstats.dir = float4(0, -.5, 0, 0);
+		if (hr != S_OK) return hr;
+
+		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.MiscFlags = NULL;
+		bufferDesc.ByteWidth = sizeof(PointLightStats);
+		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		bufferDesc.StructureByteStride = sizeof(PointLightStats);
+		subResourceData.pSysMem = &PLStats;
+		subResourceData.SysMemPitch = 0;
+		subResourceData.SysMemSlicePitch = 0;
+		hr = device->CreateBuffer(&bufferDesc, NULL, &pointlightposbuffer);
+		PLStats.pos = float4(0, -8, 0, 0);
+		if (hr != S_OK) return hr;
+
+		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		bufferDesc.MiscFlags = NULL;
+		bufferDesc.ByteWidth = sizeof(DirectionalLightStats);
+		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+		bufferDesc.StructureByteStride = sizeof(DirectionalLightStats);
+		subResourceData.pSysMem = &DLStats;
+		subResourceData.SysMemPitch = 0;
+		subResourceData.SysMemSlicePitch = 0;
+		hr = device->CreateBuffer(&bufferDesc, NULL, &directionalLightBuffer);
+		DLStats.dir = float4(0, -8, 0, 0);
 		if (hr != S_OK) return hr;
 
 		bufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
@@ -102,7 +138,7 @@ public:
 		samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 		samplerDesc.MinLOD = 0;
-		samplerDesc.MaxLOD = numbers_test_numlevels;
+		samplerDesc.MaxLOD = 1;
 		samplerDesc.MipLODBias = 0.0f;
 		samplerDesc.MaxAnisotropy = 1;
 		samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
@@ -156,9 +192,34 @@ public:
 		deviceContext->VSSetConstantBuffers(0, 1, &ConstWorldMatrixBuffer);
 		deviceContext->VSSetConstantBuffers(1, 1, &viewProjBuffer);
 
-		if (GetAsyncKeyState(0x55)){
-			spotlightPos.x += .05f;
+		deviceContext->PSSetConstantBuffers(0, 1, &spotlightPosBuffer);
+		deviceContext->PSSetConstantBuffers(1, 1, &pointlightposbuffer);
+		deviceContext->PSSetConstantBuffers(2, 1, &directionalLightBuffer);
+
+		spotlight.Update(slstats);
+		
+		//dyamic point light movement
+		if (PLStats.pos.x > 10){
+			left = true;
 		}
+		else if (PLStats.pos.x < -10){
+			left = false;
+		}
+		pointlight.Update(PLStats, left);
+
+		directionallight.Update(DLStats);
+
+		deviceContext->Map(directionalLightBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
+		memcpy(mapSubResource.pData, &DLStats, sizeof(DLStats));
+		deviceContext->Unmap(directionalLightBuffer, 0);
+
+		deviceContext->Map(pointlightposbuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
+		memcpy(mapSubResource.pData, &PLStats, sizeof(PLStats));
+		deviceContext->Unmap(pointlightposbuffer, 0);
+
+		deviceContext->Map(spotlightPosBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
+		memcpy(mapSubResource.pData, &slstats, sizeof(slstats));
+		deviceContext->Unmap(spotlightPosBuffer, 0);
 
 		deviceContext->Map(ConstWorldMatrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
 		memcpy(mapSubResource.pData, &WorldToShader, sizeof(WorldToShader));
@@ -201,7 +262,9 @@ public:
 		SAFE_RELEASE(sampler);
 		SAFE_RELEASE(blendState);
 		//SAFE_RELEASE(shaderResourceView);
+		SAFE_RELEASE(pointlightposbuffer);
 		SAFE_RELEASE(spotlightPosBuffer);
+		SAFE_RELEASE(directionalLightBuffer);
 		SAFE_RELEASE(front);
 		SAFE_RELEASE(back);
 	}

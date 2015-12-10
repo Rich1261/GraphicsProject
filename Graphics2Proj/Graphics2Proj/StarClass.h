@@ -1,8 +1,5 @@
 #pragma once
 #include "stdafx.h"
-//struct SEND_WORLD_TO_VRAM;
-//struct SIMPLE_VERTEX;
-//struct Matrix4x4;
 
 struct Star3D{
 private:

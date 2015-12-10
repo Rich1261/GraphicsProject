@@ -1,5 +1,5 @@
 #pragma once
-#include "CubeClass.h"
+#include "stdafx.h"
 
 class Skybox{
 private:
@@ -137,6 +137,8 @@ public:
 	}
 	
 	void Display(ID3D11DeviceContext *deviceContext, ID3D11Buffer *viewProjBuffer, D3D11_MAPPED_SUBRESOURCE mapSubResource, SEND_MATRICIES_TO_VRAM viewProjMatricies, float4 cameraPos){
+		
+		
 		deviceContext->OMSetBlendState(blendState, NULL, 0xffffffff);
 		//rotation = MultiplyMatrix4x4ByMatrix4x4(BuildYRotationMatrix4X4(time), BuildXRotationMatrix4X4(time));
 		//toShader.worldMatrix = MultiplyMatrix4x4ByMatrix4x4(rotation, worldMatrix);

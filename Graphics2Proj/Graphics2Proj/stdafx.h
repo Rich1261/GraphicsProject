@@ -7,16 +7,20 @@
 #include <vector>
 #include <Windows.h>
 #include <numeric>
-#include "Cube.h"
-#include "numbers_test.h"
 #include "SharedDefines.h"
 #include "DDSTextureLoader.h"
+#include "Lights.h"
+#include <comdef.h>
+#include <ctime>
+#include <cstdlib>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
 
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
-#include "Cube_PS.csh"
-#include "Cube_VS.csh"
 #include "Grid_PS.csh"
 #include "Grid_VS.csh"
 #include "Star_PS.csh"
@@ -27,6 +31,9 @@
 #include "Pyramid_VS.csh"
 #include "Floor_VS.csh"
 #include "Floor_PS.csh"
+#include "Snowflake_VS.csh"
+#include "Snowflake_PS.csh"
+#include "Snowflake_GS.csh"
 
 using namespace std;
 using namespace DirectX;
@@ -118,4 +125,22 @@ struct SEND_WORLD_TO_VRAM {
 struct SEND_MATRICIES_TO_VRAM {
 	float4x4 viewMatrix;
 	float4x4 projMatrix;
+};
+struct _OBJ_VERT_
+{
+	float pos[3];
+	float uvw[3];
+	float nrm[3];
+};
+struct SnowflakeStruct{
+	float4 pos;
+	float4 origPos;
+	float speed;
+	float dist;
+	SnowflakeStruct(float4 _pos = float4(0, 1, 0, 1), float dropSpeed = .0025f, float dropDistance = 5){
+		pos = _pos; 
+		origPos = _pos;
+		speed = dropSpeed;
+		dist = dropDistance;
+	}
 };

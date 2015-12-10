@@ -1,4 +1,12 @@
 #include "Floor.h"
+#include "CameraClass.h"
+#include "GridClass.h"
+#include "PyramidClass.h"
+#include "skybox.h"
+#include "StarClass.h"
+#include "ModelLoader.h"
+#include "Snowflake.h"
+
 #include <crtdbg.h>
 
 class DEMO_APP
@@ -15,30 +23,30 @@ class DEMO_APP
 
 	ID3D11Texture2D *backBuffer = nullptr;
 
-	D3D11_VIEWPORT viewPort;
+	D3D11_VIEWPORT viewPort, minimapViewport;
 
-	ID3D11RenderTargetView *renderTargetView = nullptr;
+	ID3D11RenderTargetView *renderTargetView = nullptr, *minimapRenderTargetView = nullptr;
 
 	D3D11_SUBRESOURCE_DATA subResourceData;
-	ID3D11Texture2D *zBuffer = nullptr;
+	ID3D11Texture2D *zBuffer = nullptr, *minimapZBuffer = nullptr;
 	D3D11_TEXTURE2D_DESC zBuffDesc;
 
-	ID3D11DepthStencilView *stencilView = nullptr;
+	ID3D11DepthStencilView *stencilView = nullptr, *minimapStencilView = nullptr;
 
 	ID3D11DepthStencilState *dsState = nullptr;
 	D3D11_DEPTH_STENCIL_DESC dsDesc;
 
-	SEND_MATRICIES_TO_VRAM toShader2;
-	float4x4 viewMatrix;
-	float4x4 projMatrix;
+	SEND_MATRICIES_TO_VRAM toShader2, minimapToShader2;
+	float4x4 viewMatrix, minimapViewMatrix;
+	float4x4 projMatrix, minimapProjMatrix;
 
 	D3D11_BUFFER_DESC constBufferDesc;
-	ID3D11Buffer *constBuffer2 = nullptr;
+	ID3D11Buffer *constBuffer2 = nullptr, *minimapConstBuffer2 = nullptr;
 
 	POINT prevPoint;
 
-	ID3D11ShaderResourceView *srv = nullptr;
-	ID3D11ShaderResourceView *srvp = nullptr;
+	ID3D11ShaderResourceView *srv = nullptr, *srvh = nullptr;
+	ID3D11ShaderResourceView *srvp = nullptr, *SnowflakeSRV = nullptr;
 	ID3D11ShaderResourceView *srvf = nullptr;
 
 	HRESULT hr;
@@ -47,12 +55,15 @@ class DEMO_APP
 	Pyramid pyramid;
 	Skybox skybox;
 	Camera myCamera;
+	Camera minimapCamera;
 	Star3D StarObj;
 	Grid myGrid;
-	Cube myCube;
+	Snowflakes snowflakeEffect;
+	Snowflakes blizzard[50];
+	//Pyramid helicoptor;
 
-	vector<_OBJ_VERT_> pyramidArray, floorArray;
-	vector<UINT> pyramidIndexArray, floorIndexArray;
+	vector<_OBJ_VERT_> pyramidArray, floorArray, heliArray;
+	vector<UINT> pyramidIndexArray, floorIndexArray, heliIndexArray;
 public:
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
@@ -108,11 +119,33 @@ void DEMO_APP::Resize(float width, float height){
 	}
 }
 
+void StartTextureThreads(ID3D11Device *device, const wchar_t *filename, ID3D11ShaderResourceView **srv, int * readyCount, condition_variable *con_var, mutex* lock){
+	CreateDDSTextureFromFile(device, filename, NULL, srv);
+	lock->lock();
+	(*readyCount)++;
+	con_var->notify_all();
+	lock->unlock();
+}
+void StartOBJThreads(const char *filename, vector<_OBJ_VERT_> *vertList, vector<UINT> *indexArray, int * readyCount, condition_variable *con_var, mutex* lock){
+	loadOBJ(filename, *vertList, *indexArray);
+	lock->lock();
+	(*readyCount)++;
+	con_var->notify_all();
+	lock->unlock();
+}
+
 DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 {
+	mutex mute;
+	int readyCount = 0;
+	condition_variable con_var;
+
 	XMMATRIX identity = XMMatrixIdentity();
 	XMStoreFloat4x4(&viewMatrix, identity);
 	XMStoreFloat4x4(&projMatrix, identity);
+	XMStoreFloat4x4(&minimapViewMatrix, identity);
+	XMStoreFloat4x4(&minimapProjMatrix, identity);
+	srand(static_cast<unsigned int>(time(nullptr)));
 
 #pragma region WINDOWS CODE STUFF
 	application = hinst;
@@ -175,6 +208,16 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	viewPort.MinDepth = 0;
 
 	HRESULT debugResultCreateRenderTargetView = device->CreateRenderTargetView(backBuffer, nullptr, &renderTargetView);
+
+	minimapViewport.TopLeftX = BACKBUFFER_WIDTH * .8;
+	minimapViewport.TopLeftY = 0;
+	minimapViewport.Height = BACKBUFFER_HEIGHT * .2;
+	minimapViewport.Width = BACKBUFFER_WIDTH * .2;
+	minimapViewport.MaxDepth = 1;
+	minimapViewport.MinDepth = 0;
+
+	device->CreateRenderTargetView(backBuffer, nullptr, &minimapRenderTargetView);
+
 	SAFE_RELEASE(backBuffer);
 
 #pragma endregion
@@ -194,6 +237,22 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 	device->CreateTexture2D(&zBuffDesc, NULL, &zBuffer);
 	device->CreateDepthStencilView(zBuffer, NULL, &stencilView);
+
+	ZeroMemory(&zBuffDesc, sizeof(zBuffDesc));
+	zBuffDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	zBuffDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	zBuffDesc.Width = UINT(BACKBUFFER_WIDTH * .2);
+	zBuffDesc.Height = UINT(BACKBUFFER_HEIGHT * .2);
+	zBuffDesc.MipLevels = 1;
+	zBuffDesc.Usage = D3D11_USAGE_DEFAULT;
+	zBuffDesc.SampleDesc.Count = 1;
+	zBuffDesc.SampleDesc.Quality = 0;
+	zBuffDesc.MiscFlags = 0;
+	zBuffDesc.CPUAccessFlags = 0;
+	zBuffDesc.ArraySize = 1;
+
+	device->CreateTexture2D(&zBuffDesc, NULL, &minimapZBuffer);
+	device->CreateDepthStencilView(minimapZBuffer, NULL, &minimapStencilView);
 
 	dsDesc.DepthEnable = true;
 	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -215,11 +274,10 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 #pragma endregion
 #pragma region CreateConstView/ProjMatrixBuffer
 
-	XMMATRIX tempProj = XMLoadFloat4x4(&projMatrix);
-	tempProj = DirectX::XMMatrixPerspectiveFovLH((3.1415f / 180.0f) * (65 * 0.5f), (RASTER_WIDTH / RASTER_HEIGHT), 0.1f, 1000.0f);
-	XMStoreFloat4x4(&projMatrix, tempProj);
 
-	//projMatrix = BuildPerspectiveProjectionMatrix(65.0f, RASTER_WIDTH / RASTER_HEIGHT, 0.1f, 100.0f);
+	XMMATRIX tempProj = XMLoadFloat4x4(&projMatrix);
+	tempProj = DirectX::XMMatrixPerspectiveFovLH((3.1415f / 180.0f) * (65 * 0.5f), (BACKBUFFER_WIDTH / BACKBUFFER_HEIGHT), 0.1f, 1000.0f);
+	XMStoreFloat4x4(&projMatrix, tempProj);
 
 	constBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	constBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -234,6 +292,25 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	device->CreateBuffer(&constBufferDesc, NULL, &constBuffer2);
 	toShader2.projMatrix = projMatrix;
 	toShader2.viewMatrix = viewMatrix;
+
+
+	XMMATRIX tempminimapProj = XMLoadFloat4x4(&minimapProjMatrix);
+	tempminimapProj = DirectX::XMMatrixPerspectiveFovLH((3.1415f / 180.0f) * (65 * 0.5f), ((BACKBUFFER_WIDTH * .2) / (BACKBUFFER_HEIGHT*.2)), 0.1f, 1000.0f);
+	XMStoreFloat4x4(&minimapProjMatrix, tempminimapProj);
+
+	constBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	constBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	constBufferDesc.MiscFlags = NULL;
+	constBufferDesc.ByteWidth = sizeof(SEND_MATRICIES_TO_VRAM);
+	constBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	constBufferDesc.StructureByteStride = sizeof(SEND_MATRICIES_TO_VRAM);
+	TwoMatricies4x4 minimapnewMatrix(minimapViewMatrix, minimapProjMatrix);
+	subResourceData.pSysMem = &newMatrix;
+	subResourceData.SysMemPitch = 0;
+	subResourceData.SysMemSlicePitch = 0;
+	device->CreateBuffer(&constBufferDesc, NULL, &minimapConstBuffer2);
+	minimapToShader2.projMatrix = minimapProjMatrix;
+	minimapToShader2.viewMatrix = minimapViewMatrix;
 
 #pragma endregion
 
@@ -331,27 +408,55 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 
+#pragma region InitalSnowflakesPos
+	vector<SnowflakeStruct> snowflakes;
+	snowflakes.push_back(SnowflakeStruct(float4(0, 2, 0, 1)));
+	snowflakes.push_back(SnowflakeStruct(float4(0, 3, 0, 1)));
+	snowflakes.push_back(SnowflakeStruct(float4(1, 2, 0, 1)));
+	snowflakes.push_back(SnowflakeStruct(float4(1, 3, 0, 1)));
+#pragma endregion
+
+	vector<SnowflakeStruct> blizzardFlakes[50];
+	for (int i = 0; i < 50; i++){
+		blizzardFlakes[i].push_back(SnowflakeStruct(float4(static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), 1), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / .05f)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 15))));
+	}
+	vector<thread> threads;
+	//thread thread1 = thread(StartTextureThreads, device, L"OutputCube.dds", &srv, &readyCount, &con_var, &mute);
+	threads.push_back(thread(StartTextureThreads, device, L"OutputCube.dds", &srv, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"pyramidTex.dds", &srvp, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"pyramidTex.dds", &srvf, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"Snowflake.dds", &SnowflakeSRV, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartOBJThreads, "..\\Graphics2Proj\\Pyramid.obj", &pyramidArray, &pyramidIndexArray, &readyCount, &con_var, &mute));
+	for (UINT i = 0; i < threads.size(); i++){
+		threads[i].detach();
+	}
+	unique_lock<mutex> lockU(mute);
+	con_var.wait(lockU, [&](){return readyCount == threads.size(); });
+	lockU.unlock();
+
 	GetCursorPos(&prevPoint);
 	myCamera.Instantiate(prevPoint);
+	minimapCamera.Instantiate(prevPoint, 1);
 
-	myCube.Instantiate(device, Cube_data, 776, Cube_indicies, 1692, numbers_test_pixels, numbers_test_width, numbers_test_height, numbers_test_numlevels, numbers_test_leveloffsets);
-	
 	myGrid.Instantiate(device, fullGrid, 84);
-	
+
 	StarObj.Instantiate(device, star, 22, starIndexArray, 120);
 
+
 	//skybox creation
-	CreateDDSTextureFromFile(device, L"OutputCube.dds", NULL, &srv);
 	skybox.Instantiate(device, cube, 8, indicies, 36, srv);
 
 	//pyramid creation
-	loadOBJ("C:\\Users\\Rich\\Desktop\\Graphics 2\\Graphics2Proj\\Graphics2\\Graphics2Proj\\Graphics2Proj\\Pyramid.obj", pyramidArray, pyramidIndexArray);
-	hr = CreateDDSTextureFromFile(device, L"pyramidTex.dds", NULL, &srvp);
 	pyramid.Instantiate(device, &pyramidArray, &pyramidIndexArray, srvp);
 
 	//floor creation
-	hr = CreateDDSTextureFromFile(device, L"pyramidTex.dds", NULL, &srvf);
 	floor.Instantiate(device, &floorarray, &floorindexarray, srvf);
+
+	snowflakeEffect.Instantiate(device, &snowflakes, SnowflakeSRV);
+
+	for (int i = 0; i < 50; i++){
+		blizzard[i].Instantiate(device, &blizzardFlakes[i], SnowflakeSRV);
+	}
 }
 
 bool DEMO_APP::Run()
@@ -370,11 +475,39 @@ bool DEMO_APP::Run()
 	skybox.Display(deviceContext, constBuffer2, mapSubResource, toShader2, myCamera.GetCameraPos(viewMatrix));
 
 	toShader2.viewMatrix = myCamera.Update(viewMatrix);
+
 	floor.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
 	pyramid.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
-	myCube.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
 	myGrid.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
 	StarObj.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
+	snowflakeEffect.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
+	for (int i = 0; i < 50; i++){
+		blizzard[i].Display(deviceContext, constBuffer2, mapSubResource, toShader2);
+	}
+
+	deviceContext->ClearDepthStencilView(stencilView, D3D11_CLEAR_DEPTH, 1, 0);
+
+	//end main viewport//
+	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
+	//begin minimap viewport//
+	//deviceContext->OMSetRenderTargets(1, &minimapRenderTargetView, minimapStencilView);
+	deviceContext->RSSetViewports(1, &minimapViewport);
+
+	//deviceContext->ClearRenderTargetView(minimapRenderTargetView, darkBlueRGBA);
+	deviceContext->ClearDepthStencilView(minimapStencilView, D3D11_CLEAR_DEPTH, 1, 0);
+
+	skybox.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2, myCamera.GetCameraPos(viewMatrix));
+
+	minimapToShader2.viewMatrix = minimapCamera.Update(minimapViewMatrix);
+
+	floor.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	pyramid.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	myGrid.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	StarObj.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	snowflakeEffect.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	for (int i = 0; i < 50; i++){
+		blizzard[i].Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2);
+	}
 
 	swapChain->Present(1, 0);
 	return true;
@@ -382,12 +515,20 @@ bool DEMO_APP::Run()
 
 bool DEMO_APP::ShutDown()
 {
+	for (int i = 0; i < 50; i++){
+		blizzard[i].Terminate();
+	}
 	floor.Terminate();
 	pyramid.Terminate();
 	skybox.Terminate();
 	StarObj.Terminate();
-	myCube.Terminate();
 	myGrid.Terminate();
+	snowflakeEffect.Terminate();
+	//helicoptor.Terminate();
+	SAFE_RELEASE(minimapRenderTargetView);
+	SAFE_RELEASE(minimapConstBuffer2);
+	SAFE_RELEASE(minimapStencilView);
+	SAFE_RELEASE(minimapZBuffer);
 	SAFE_RELEASE(deviceContext);
 	SAFE_RELEASE(swapChain);
 	SAFE_RELEASE(backBuffer);
@@ -399,7 +540,7 @@ bool DEMO_APP::ShutDown()
 	SAFE_RELEASE(srv);
 	SAFE_RELEASE(srvp);
 	SAFE_RELEASE(srvf);
-
+	SAFE_RELEASE(SnowflakeSRV);
 	ID3D11Debug * debug = nullptr;
 	HRESULT hr = device->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debug));
 	if (SUCCEEDED(hr)){

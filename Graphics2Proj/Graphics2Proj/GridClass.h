@@ -1,5 +1,5 @@
 #pragma once
-#include "CameraClass.h"
+#include "stdafx.h"
 
 class Grid{
 private:

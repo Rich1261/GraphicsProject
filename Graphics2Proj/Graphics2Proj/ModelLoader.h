@@ -1,5 +1,5 @@
 #pragma once
-#include "skybox.h"
+#include "stdafx.h"
 
 string loadOBJ(const char* filepath, vector<_OBJ_VERT_> &vertList, vector<UINT> &indexarray){
 	string error;
@@ -65,6 +65,7 @@ string loadOBJ(const char* filepath, vector<_OBJ_VERT_> &vertList, vector<UINT> 
 	for (UINT i = 0; i < uvIndices.size(); i++){
 		UINT uvIndex = uvIndices[i];
 		float2 uv = tempUVList[uvIndex - 1];
+		uv.x = 1 - uv.x;
 		*(float3*)(&vertList[i].uvw) = float3(uv.x, uv.y, 0);
 	}
 	for (UINT i = 0; i < normIndices.size(); i++){
