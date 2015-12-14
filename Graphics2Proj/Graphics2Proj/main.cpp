@@ -6,6 +6,7 @@
 #include "StarClass.h"
 #include "ModelLoader.h"
 #include "Snowflake.h"
+#include "Instanced.h"
 
 #include <crtdbg.h>
 
@@ -21,7 +22,7 @@ class DEMO_APP
 	DXGI_MODE_DESC displayModeDesc;
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
 
-	ID3D11Texture2D *backBuffer = nullptr;
+	ID3D11Texture2D *backBuffer = nullptr, *offScreenTexture = nullptr;
 
 	D3D11_VIEWPORT viewPort, minimapViewport;
 
@@ -47,7 +48,8 @@ class DEMO_APP
 
 	ID3D11ShaderResourceView *srv = nullptr, *srvh = nullptr;
 	ID3D11ShaderResourceView *srvp = nullptr, *SnowflakeSRV = nullptr;
-	ID3D11ShaderResourceView *srvf = nullptr;
+	ID3D11ShaderResourceView *srvf = nullptr, *srvfn = nullptr;
+	ID3D11ShaderResourceView *StalagmiteSRV = nullptr;
 
 	HRESULT hr;
 	//OBJECTS//
@@ -60,10 +62,11 @@ class DEMO_APP
 	Grid myGrid;
 	Snowflakes snowflakeEffect;
 	Snowflakes blizzard[50];
+	Instance stalagmites;
 	//Pyramid helicoptor;
 
-	vector<_OBJ_VERT_> pyramidArray, floorArray, heliArray;
-	vector<UINT> pyramidIndexArray, floorIndexArray, heliIndexArray;
+	vector<_OBJ_VERT_> pyramidArray, floorArray, stalagmiteArray;
+	vector<UINT> pyramidIndexArray, floorIndexArray, stalagmiteIndexArray;
 public:
 	DEMO_APP(HINSTANCE hinst, WNDPROC proc);
 	bool Run();
@@ -314,6 +317,8 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 
 #pragma endregion
 
+	
+
 #pragma region CreateStarCoords
 	SIMPLE_VERTEX star[22];
 	star[0].x = 0; star[0].y = 0; star[0].z = -.75f;
@@ -407,7 +412,6 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	floorindexarray.push_back(0);
 
 #pragma endregion
-
 #pragma region InitalSnowflakesPos
 	vector<SnowflakeStruct> snowflakes;
 	snowflakes.push_back(SnowflakeStruct(float4(0, 2, 0, 1)));
@@ -421,12 +425,14 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 		blizzardFlakes[i].push_back(SnowflakeStruct(float4(static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 10)), 1), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / .05f)), static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / 15))));
 	}
 	vector<thread> threads;
-	//thread thread1 = thread(StartTextureThreads, device, L"OutputCube.dds", &srv, &readyCount, &con_var, &mute);
 	threads.push_back(thread(StartTextureThreads, device, L"OutputCube.dds", &srv, &readyCount, &con_var, &mute));
 	threads.push_back(thread(StartTextureThreads, device, L"pyramidTex.dds", &srvp, &readyCount, &con_var, &mute));
-	threads.push_back(thread(StartTextureThreads, device, L"pyramidTex.dds", &srvf, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"151.dds", &srvf, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"151_norm.dds", &srvfn, &readyCount, &con_var, &mute));
 	threads.push_back(thread(StartTextureThreads, device, L"Snowflake.dds", &SnowflakeSRV, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartTextureThreads, device, L"Stalagmite.dds", &StalagmiteSRV, &readyCount, &con_var, &mute));
 	threads.push_back(thread(StartOBJThreads, "..\\Graphics2Proj\\Pyramid.obj", &pyramidArray, &pyramidIndexArray, &readyCount, &con_var, &mute));
+	threads.push_back(thread(StartOBJThreads, "..\\Graphics2Proj\\Stalagmite.obj", &stalagmiteArray, &stalagmiteIndexArray, &readyCount, &con_var, &mute));
 	for (UINT i = 0; i < threads.size(); i++){
 		threads[i].detach();
 	}
@@ -450,13 +456,15 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	pyramid.Instantiate(device, &pyramidArray, &pyramidIndexArray, srvp);
 
 	//floor creation
-	floor.Instantiate(device, &floorarray, &floorindexarray, srvf);
+	floor.Instantiate(device, &floorarray, &floorindexarray, srvf, srvfn);
 
 	snowflakeEffect.Instantiate(device, &snowflakes, SnowflakeSRV);
 
 	for (int i = 0; i < 50; i++){
 		blizzard[i].Instantiate(device, &blizzardFlakes[i], SnowflakeSRV);
 	}
+
+	stalagmites.Instantiate(device, &stalagmiteArray, &stalagmiteIndexArray, StalagmiteSRV);
 }
 
 bool DEMO_APP::Run()
@@ -484,6 +492,7 @@ bool DEMO_APP::Run()
 	for (int i = 0; i < 50; i++){
 		blizzard[i].Display(deviceContext, constBuffer2, mapSubResource, toShader2);
 	}
+	stalagmites.Display(deviceContext, constBuffer2, mapSubResource, toShader2);
 
 	deviceContext->ClearDepthStencilView(stencilView, D3D11_CLEAR_DEPTH, 1, 0);
 
@@ -524,7 +533,11 @@ bool DEMO_APP::ShutDown()
 	StarObj.Terminate();
 	myGrid.Terminate();
 	snowflakeEffect.Terminate();
+	stalagmites.Terminate();
 	//helicoptor.Terminate();
+	SAFE_RELEASE(offScreenTexture);
+	SAFE_RELEASE(StalagmiteSRV);
+	SAFE_RELEASE(srvfn);
 	SAFE_RELEASE(minimapRenderTargetView);
 	SAFE_RELEASE(minimapConstBuffer2);
 	SAFE_RELEASE(minimapStencilView);

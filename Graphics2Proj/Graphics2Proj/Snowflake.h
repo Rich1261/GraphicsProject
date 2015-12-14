@@ -172,28 +172,23 @@ public:
 		timer.Signal();
 		time += (float)timer.Delta();
 
-		//WorldToShader.worldMatrix.m[3][0] = 0;
-		//WorldToShader.worldMatrix.m[3][1] = 0;
-		//WorldToShader.worldMatrix.m[3][2] = 0;
-		//WorldToShader.worldMatrix.m[3][3] = 0;
-
-		
 		//float3 pos = float3(WorldToShader.worldMatrix.m[3][0], WorldToShader.worldMatrix.m[3][1], WorldToShader.worldMatrix.m[3][2]);
 		//WorldToShader.worldMatrix.m[3][0] = WorldToShader.worldMatrix.m[3][1] = WorldToShader.worldMatrix.m[3][2] = 0;
 
 		//XMMATRIX world = XMLoadFloat4x4(&WorldToShader.worldMatrix); 
-		//XMMATRIX rotation = XMMatrixRotationY(.025f);
+		//XMMATRIX rotation = XMMatrixRotationY(.0025f);
 		//XMMATRIX temp = XMMatrixMultiply(rotation, world);
 		//XMStoreFloat4x4(&WorldToShader.worldMatrix, temp);
+
+		//WorldToShader.worldMatrix.m[3][0] = pos.x;
+		//WorldToShader.worldMatrix.m[3][1] = pos.y;
+		//WorldToShader.worldMatrix.m[3][2] = pos.z;
 
 		for (UINT i = 0; i < points.size(); i++){
 			points[i].pos.y -= points[i].speed;
 			if (points[i].pos.y <= (points[i].origPos.y - points[i].dist))
 				points[i].pos.y = points[i].origPos.y;
 		}
-		//WorldToShader.worldMatrix.m[3][0] = pos.x;
-		//WorldToShader.worldMatrix.m[3][1] = pos.y;
-		//WorldToShader.worldMatrix.m[3][2] = pos.z;
 		//WorldToShader.faceNum -= .0025f;
 		//if (WorldToShader.faceNum < -3) WorldToShader.faceNum = 0;
 

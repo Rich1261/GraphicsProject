@@ -48,9 +48,18 @@
     <FxCompile Include="Floor_VS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Snowflake_GS.hlsl" />
-    <FxCompile Include="Snowflake_PS.hlsl" />
-    <FxCompile Include="Snowflake_VS.hlsl" />
+    <FxCompile Include="Snowflake_GS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Snowflake_PS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Snowflake_VS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Instanced_VS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -101,6 +110,9 @@
       <Filter>ObjectClasses</Filter>
     </ClInclude>
     <ClInclude Include="Snowflake.h">
+      <Filter>ObjectClasses</Filter>
+    </ClInclude>
+    <ClInclude Include="Instanced.h">
       <Filter>ObjectClasses</Filter>
     </ClInclude>
   </ItemGroup>

@@ -10,7 +10,7 @@ private:
 	ID3D11Texture2D *texture = nullptr;
 	ID3D11SamplerState *sampler = nullptr;
 	ID3D11BlendState *blendState = nullptr;
-	ID3D11ShaderResourceView *shaderResourceView = nullptr;
+	ID3D11ShaderResourceView *shaderResourceView = nullptr, *shaderResourceViewNormal = nullptr;
 	ID3D11RasterizerState *front = nullptr, *back = nullptr;
 
 	D3D11_BUFFER_DESC bufferDesc;
@@ -34,9 +34,10 @@ private:
 	float4 pointlightPos;
 	bool left = false;
 public:
-	HRESULT Instantiate(ID3D11Device *device, vector<_OBJ_VERT_> *coordArray, vector<UINT> *indexArray, ID3D11ShaderResourceView *_srv = nullptr){
+	HRESULT Instantiate(ID3D11Device *device, vector<_OBJ_VERT_> *coordArray, vector<UINT> *indexArray, ID3D11ShaderResourceView *ColorMap = nullptr, ID3D11ShaderResourceView *NormalMap = nullptr){
 		
-		if (_srv != nullptr) shaderResourceView = _srv;
+		if (ColorMap != nullptr) shaderResourceView = ColorMap;
+		if (NormalMap != nullptr) shaderResourceViewNormal = NormalMap;
 		sizeofIndexArray = indexArray->size();
 		
 		XMMATRIX identity = XMMatrixIdentity();
@@ -59,12 +60,13 @@ public:
 		hr = device->CreatePixelShader(Floor_PS, sizeof(Floor_PS), NULL, &PixelShader);
 		if (hr != S_OK) return hr;
 
-		D3D11_INPUT_ELEMENT_DESC inputElementDesc[3] = {
+		D3D11_INPUT_ELEMENT_DESC inputElementDesc[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "UV", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		};
-		hr = device->CreateInputLayout(inputElementDesc, 3, Floor_VS, sizeof(Floor_VS), &InputLayout);
+		hr = device->CreateInputLayout(inputElementDesc, 4, Floor_VS, sizeof(Floor_VS), &InputLayout);
 		if (hr != S_OK) return hr;
 
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -241,15 +243,13 @@ public:
 		deviceContext->PSSetShader(PixelShader, NULL, 0);
 		deviceContext->PSSetSamplers(0, 1, &sampler);
 		deviceContext->PSSetShaderResources(0, 1, &shaderResourceView);
+		deviceContext->PSSetShaderResources(1, 1, &shaderResourceViewNormal);
 
 		deviceContext->IASetInputLayout(InputLayout);
 
 		deviceContext->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		deviceContext->RSSetState(front);
 		deviceContext->DrawIndexed(sizeofIndexArray, 0, 0);
-		//deviceContext->RSSetState(back);
-		//deviceContext->DrawIndexed(sizeofIndexArray, 0, 0);
-		//deviceContext->RSSetState(front);
 	}
 	void Terminate(){
 		SAFE_RELEASE(VertexBuffer);
@@ -261,7 +261,6 @@ public:
 		SAFE_RELEASE(texture);
 		SAFE_RELEASE(sampler);
 		SAFE_RELEASE(blendState);
-		//SAFE_RELEASE(shaderResourceView);
 		SAFE_RELEASE(pointlightposbuffer);
 		SAFE_RELEASE(spotlightPosBuffer);
 		SAFE_RELEASE(directionalLightBuffer);

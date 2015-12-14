@@ -49,12 +49,13 @@ public:
 		hr = device->CreatePixelShader(Pyramid_PS, sizeof(Pyramid_PS), NULL, &PixelShader);
 		if (hr != S_OK) return hr;
 
-		D3D11_INPUT_ELEMENT_DESC inputElementDesc[3] = {
+		D3D11_INPUT_ELEMENT_DESC inputElementDesc[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "UV", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		};
-		hr = device->CreateInputLayout(inputElementDesc, 3, Pyramid_VS, sizeof(Pyramid_VS), &InputLayout);
+		hr = device->CreateInputLayout(inputElementDesc, 4, Pyramid_VS, sizeof(Pyramid_VS), &InputLayout);
 		if (hr != S_OK) return hr;
 
 		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -173,9 +174,6 @@ public:
 		deviceContext->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		deviceContext->RSSetState(back);
 		deviceContext->DrawIndexed(sizeofIndexArray, 0, 0);
-		//deviceContext->RSSetState(back);
-		//deviceContext->DrawIndexed(sizeofIndexArray, 0, 0);
-		//deviceContext->RSSetState(front);
 	}
 	void Terminate(){
 		SAFE_RELEASE(VertexBuffer);
@@ -186,7 +184,6 @@ public:
 		SAFE_RELEASE(PixelShader);
 		SAFE_RELEASE(texture);
 		SAFE_RELEASE(sampler);
-		//SAFE_RELEASE(shaderResourceView);
 		SAFE_RELEASE(blendState);
 		SAFE_RELEASE(front);
 		SAFE_RELEASE(back);

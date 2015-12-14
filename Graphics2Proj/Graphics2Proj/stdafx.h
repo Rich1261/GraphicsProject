@@ -34,6 +34,7 @@
 #include "Snowflake_VS.csh"
 #include "Snowflake_PS.csh"
 #include "Snowflake_GS.csh"
+#include "Instanced_VS.csh"
 
 using namespace std;
 using namespace DirectX;
@@ -122,15 +123,25 @@ struct SEND_WORLD_TO_VRAM {
 	float faceNum = 1;
 	float3 padding;
 };
+struct INSTANCED_WORLD_TO_VRAM {
+	float4x4 worldMatricies[100];
+};
 struct SEND_MATRICIES_TO_VRAM {
 	float4x4 viewMatrix;
 	float4x4 projMatrix;
 };
 struct _OBJ_VERT_
 {
+	float3 pos;
+	float3 uvw;
+	float3 nrm;
+	float4 tan;
+};
+struct NormalVerts{
 	float pos[3];
 	float uvw[3];
 	float nrm[3];
+	float tan[4];
 };
 struct SnowflakeStruct{
 	float4 pos;
@@ -144,3 +155,6 @@ struct SnowflakeStruct{
 		dist = dropDistance;
 	}
 };
+float3 operator-(float3 lhs, float3 rhs){
+	return float3(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+}

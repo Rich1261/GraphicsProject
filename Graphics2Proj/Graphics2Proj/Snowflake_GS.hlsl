@@ -1,5 +1,12 @@
 #pragma pack_matrix(row_major)
 
+struct INPUT_VERTEX
+{
+	float4 pos : SV_POSITION;
+	float4 opos : ORIGPOS;
+	float speed : SPEED;
+	float dist : DISTANCE;
+};
 struct GSOutput
 {
 	float4 pos : SV_POSITION;
@@ -21,13 +28,6 @@ cbuffer actualStats : register(b2)
 	float4 Aopos;
 	float Aspeed;
 	float Adist;
-};
-struct INPUT_VERTEX
-{
-	float4 pos : SV_POSITION;
-	float4 opos : ORIGPOS;
-	float speed : SPEED;
-	float dist : DISTANCE;
 };
 
 [maxvertexcount(4)]
