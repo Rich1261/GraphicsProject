@@ -117,7 +117,7 @@ public:
 		rasterDesc.DepthClipEnable = true;
 		rasterDesc.ScissorEnable = false;
 		rasterDesc.MultisampleEnable = false;
-		rasterDesc.AntialiasedLineEnable = false;
+		rasterDesc.AntialiasedLineEnable = true;
 		hr = device->CreateRasterizerState(&rasterDesc, &back);
 		if (hr != S_OK) return hr;
 
@@ -130,7 +130,7 @@ public:
 		rasterDesc.DepthClipEnable = true;
 		rasterDesc.ScissorEnable = false;
 		rasterDesc.MultisampleEnable = false;
-		rasterDesc.AntialiasedLineEnable = false;
+		rasterDesc.AntialiasedLineEnable = true;
 		hr = device->CreateRasterizerState(&rasterDesc, &front);
 		if (hr != S_OK) return hr;
 		return hr;

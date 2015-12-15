@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.h"
 
-class Floor{
+class RenderToTexture{
 private:
 	ID3D11Buffer *VertexBuffer = nullptr, *IndexBuffer = nullptr, *ConstWorldMatrixBuffer = nullptr, *spotlightPosBuffer = nullptr, *pointlightposbuffer = nullptr, *directionalLightBuffer = nullptr;
 	ID3D11InputLayout *InputLayout = nullptr;
@@ -21,25 +21,22 @@ private:
 	D3D11_RASTERIZER_DESC rasterDesc;
 	SEND_WORLD_TO_VRAM WorldToShader;
 	float4x4 WorldMatrix;
-	int sizeofIndexArray = 0;
-	float flipTime = 1.0f;
-	bool tempIndexedFlag = true;
 	HRESULT hr;
-	Spotlight spotlight;
-	SpotlightStats slstats;
-	PointLight pointlight;
-	PointLightStats PLStats;
-	DirectionalLight directionallight;
-	DirectionalLightStats DLStats;
-	float4 pointlightPos;
-	bool left = false;
+
+	//ID3D11Texture2D *renderTargTexMap = nullptr;
+	//ID3D11RenderTargetView *renderTargViewMap = nullptr;
+	//ID3D11ShaderResourceView *shaderResourceViewMap = nullptr;
+	D3D11_TEXTURE2D_DESC texD;
+	D3D11_RENDER_TARGET_VIEW_DESC renderTargViewD;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvD;
+	float4x4 mapView;
+	float4x4 mapProj;
 public:
 	HRESULT Instantiate(ID3D11Device *device, vector<_OBJ_VERT_> *coordArray, vector<UINT> *indexArray, ID3D11ShaderResourceView *ColorMap = nullptr, ID3D11ShaderResourceView *NormalMap = nullptr){
-		
 		if (ColorMap != nullptr) shaderResourceView = ColorMap;
 		if (NormalMap != nullptr) shaderResourceViewNormal = NormalMap;
-		sizeofIndexArray = indexArray->size();
-		
+		//sizeofIndexArray = indexArray->size();
+
 		XMMATRIX identity = XMMatrixIdentity();
 		XMStoreFloat4x4(&WorldMatrix, identity);
 
@@ -80,46 +77,6 @@ public:
 		subResourceData.SysMemSlicePitch = 0;
 		hr = device->CreateBuffer(&bufferDesc, NULL, &ConstWorldMatrixBuffer);
 		WorldToShader.worldMatrix = WorldMatrix;
-		if (hr != S_OK) return hr;
-
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		bufferDesc.MiscFlags = NULL;
-		bufferDesc.ByteWidth = sizeof(slstats);
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.StructureByteStride = sizeof(slstats);
-		subResourceData.pSysMem = &slstats;
-		subResourceData.SysMemPitch = 0;
-		subResourceData.SysMemSlicePitch = 0;
-		hr = device->CreateBuffer(&bufferDesc, NULL, &spotlightPosBuffer);
-		slstats.pos = float4(0, -9.5, 0, 0);
-		slstats.dir = float4(0, -.5, 0, 0);
-		if (hr != S_OK) return hr;
-
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		bufferDesc.MiscFlags = NULL;
-		bufferDesc.ByteWidth = sizeof(PointLightStats);
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.StructureByteStride = sizeof(PointLightStats);
-		subResourceData.pSysMem = &PLStats;
-		subResourceData.SysMemPitch = 0;
-		subResourceData.SysMemSlicePitch = 0;
-		hr = device->CreateBuffer(&bufferDesc, NULL, &pointlightposbuffer);
-		PLStats.pos = float4(0, -8, 0, 0);
-		if (hr != S_OK) return hr;
-
-		bufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-		bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-		bufferDesc.MiscFlags = NULL;
-		bufferDesc.ByteWidth = sizeof(DirectionalLightStats);
-		bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-		bufferDesc.StructureByteStride = sizeof(DirectionalLightStats);
-		subResourceData.pSysMem = &DLStats;
-		subResourceData.SysMemPitch = 0;
-		subResourceData.SysMemSlicePitch = 0;
-		hr = device->CreateBuffer(&bufferDesc, NULL, &directionalLightBuffer);
-		DLStats.dir = float4(0, -8, 0, 0);
 		if (hr != S_OK) return hr;
 
 		bufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
@@ -188,68 +145,8 @@ public:
 		if (hr != S_OK) return hr;
 		return hr;
 	}
-	void Display(ID3D11DeviceContext *deviceContext, ID3D11Buffer *viewProjBuffer, D3D11_MAPPED_SUBRESOURCE mapSubResource, SEND_MATRICIES_TO_VRAM viewProjMatricies){
-		deviceContext->OMSetBlendState(blendState, NULL, 0xffffffff);
+	void Display(){
 
-		deviceContext->VSSetConstantBuffers(0, 1, &ConstWorldMatrixBuffer);
-		deviceContext->VSSetConstantBuffers(1, 1, &viewProjBuffer);
-
-		deviceContext->PSSetConstantBuffers(0, 1, &spotlightPosBuffer);
-		deviceContext->PSSetConstantBuffers(1, 1, &pointlightposbuffer);
-		deviceContext->PSSetConstantBuffers(2, 1, &directionalLightBuffer);
-
-		spotlight.Update(slstats);
-		
-		//dyamic point light movement
-		if (PLStats.pos.x > 10){
-			left = true;
-		}
-		else if (PLStats.pos.x < -10){
-			left = false;
-		}
-		pointlight.Update(PLStats, left);
-
-		directionallight.Update(DLStats);
-
-		deviceContext->Map(directionalLightBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
-		memcpy(mapSubResource.pData, &DLStats, sizeof(DLStats));
-		deviceContext->Unmap(directionalLightBuffer, 0);
-
-		deviceContext->Map(pointlightposbuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
-		memcpy(mapSubResource.pData, &PLStats, sizeof(PLStats));
-		deviceContext->Unmap(pointlightposbuffer, 0);
-
-		deviceContext->Map(spotlightPosBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
-		memcpy(mapSubResource.pData, &slstats, sizeof(slstats));
-		deviceContext->Unmap(spotlightPosBuffer, 0);
-
-		deviceContext->Map(ConstWorldMatrixBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
-		memcpy(mapSubResource.pData, &WorldToShader, sizeof(WorldToShader));
-		deviceContext->Unmap(ConstWorldMatrixBuffer, 0);
-
-		deviceContext->Map(viewProjBuffer, 0, D3D11_MAP_WRITE_DISCARD, NULL, &mapSubResource);
-		memcpy(mapSubResource.pData, &viewProjMatricies, sizeof(viewProjMatricies));
-		deviceContext->Unmap(viewProjBuffer, 0);
-
-		const UINT size = sizeof(_OBJ_VERT_);
-		const UINT offset = 0;
-
-		deviceContext->IASetVertexBuffers(0, 1, &VertexBuffer, &size, &offset);
-
-		deviceContext->IASetIndexBuffer(IndexBuffer, DXGI_FORMAT_R32_UINT, 0);
-
-		deviceContext->VSSetShader(VertexShader, NULL, 0);
-
-		deviceContext->PSSetShader(PixelShader, NULL, 0);
-		deviceContext->PSSetSamplers(0, 1, &sampler);
-		deviceContext->PSSetShaderResources(0, 1, &shaderResourceView);
-		deviceContext->PSSetShaderResources(1, 1, &shaderResourceViewNormal);
-
-		deviceContext->IASetInputLayout(InputLayout);
-
-		deviceContext->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		deviceContext->RSSetState(front);
-		deviceContext->DrawIndexed(sizeofIndexArray, 0, 0);
 	}
 	void Terminate(){
 		SAFE_RELEASE(VertexBuffer);

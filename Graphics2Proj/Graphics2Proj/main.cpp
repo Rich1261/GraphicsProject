@@ -101,7 +101,7 @@ void DEMO_APP::Resize(float width, float height){
 		zBuffDesc.Height = (UINT)height;
 		zBuffDesc.MipLevels = 1;
 		zBuffDesc.Usage = D3D11_USAGE_DEFAULT;
-		zBuffDesc.SampleDesc.Count = 1;
+		zBuffDesc.SampleDesc.Count = 2;
 		zBuffDesc.SampleDesc.Quality = 0;
 		zBuffDesc.MiscFlags = 0;
 		zBuffDesc.CPUAccessFlags = 0;
@@ -188,7 +188,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	swapChainDesc.BufferDesc = displayModeDesc;
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	swapChainDesc.OutputWindow = window;
-	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Count = 2;
 	//chnage count to 2+ on all counts and make sure renderTarget + depth buffer
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
@@ -232,7 +232,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	zBuffDesc.Height = BACKBUFFER_HEIGHT;
 	zBuffDesc.MipLevels = 1;
 	zBuffDesc.Usage = D3D11_USAGE_DEFAULT;
-	zBuffDesc.SampleDesc.Count = 1;
+	zBuffDesc.SampleDesc.Count = 2;
 	zBuffDesc.SampleDesc.Quality = 0;
 	zBuffDesc.MiscFlags = 0;
 	zBuffDesc.CPUAccessFlags = 0;
@@ -248,7 +248,7 @@ DEMO_APP::DEMO_APP(HINSTANCE hinst, WNDPROC proc)
 	zBuffDesc.Height = UINT(BACKBUFFER_HEIGHT * .2);
 	zBuffDesc.MipLevels = 1;
 	zBuffDesc.Usage = D3D11_USAGE_DEFAULT;
-	zBuffDesc.SampleDesc.Count = 1;
+	zBuffDesc.SampleDesc.Count = 2;
 	zBuffDesc.SampleDesc.Quality = 0;
 	zBuffDesc.MiscFlags = 0;
 	zBuffDesc.CPUAccessFlags = 0;
@@ -499,10 +499,9 @@ bool DEMO_APP::Run()
 	//end main viewport//
 	//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~//
 	//begin minimap viewport//
-	//deviceContext->OMSetRenderTargets(1, &minimapRenderTargetView, minimapStencilView);
+
 	deviceContext->RSSetViewports(1, &minimapViewport);
 
-	//deviceContext->ClearRenderTargetView(minimapRenderTargetView, darkBlueRGBA);
 	deviceContext->ClearDepthStencilView(minimapStencilView, D3D11_CLEAR_DEPTH, 1, 0);
 
 	skybox.Display(deviceContext, minimapConstBuffer2, mapSubResource, minimapToShader2, myCamera.GetCameraPos(viewMatrix));

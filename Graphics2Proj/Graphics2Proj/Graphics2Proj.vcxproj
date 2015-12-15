@@ -186,6 +186,7 @@
     <ClInclude Include="Lights.h" />
     <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="PyramidClass.h" />
+    <ClInclude Include="RenderToTexture.h" />
     <ClInclude Include="SharedDefines.h" />
     <ClInclude Include="skybox.h" />
     <ClInclude Include="Snowflake.h" />

@@ -115,5 +115,8 @@
     <ClInclude Include="Instanced.h">
       <Filter>ObjectClasses</Filter>
     </ClInclude>
+    <ClInclude Include="RenderToTexture.h">
+      <Filter>ObjectClasses</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
