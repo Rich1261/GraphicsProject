@@ -31,13 +31,7 @@ void CreateTangents(vector<_OBJ_VERT_> &vertList){
 		XMVECTOR dot = XMVector3Dot(u, v);
 		XMVECTOR tan = v - u * dot.m128_f32[0];
 		tan = XMVector3Normalize(tan);
-
-		//XMVECTOR vec1 = XMVectorSet(-normal.y, normal.x, normal.z, 0.0f);
-		//XMVECTOR vec2 = XMVectorSet(normal.x, normal.y, normal.z, 0.0f);
-		//XMVECTOR tangent = XMVector3Cross(vec1, vec2);
-
 		XMStoreFloat4(&vertList[i].tan, tan);
-
 		XMVECTOR cross = XMVector3Cross(u, v);
 		XMVECTOR tangent = XMVectorSet(tan2[i].x, tan2[i].y, tan2[i].z, 0.0f);
 		tangent = XMVector3Normalize(tangent);
